@@ -2,6 +2,7 @@ package etcd
 
 import (
 	"testing"
+	"time"
 
 	"github.com/coreos/etcd/client"
 	"github.com/stretchr/testify/assert"
@@ -51,6 +52,11 @@ func TestDecodePrimitiveTypes(t *testing.T) {
 	err = decoder.Decode("/path/to/some/value/bool", &f)
 	assert.Nil(t, err)
 	assert.Equal(t, false, f)
+
+	var g time.Duration
+	err = decoder.Decode("/path/to/some/value", &g)
+	assert.Nil(t, err)
+	assert.Equal(t, time.Duration(10), g)
 }
 
 func TestDecodeInterface(t *testing.T) {
@@ -182,7 +188,7 @@ func TestDecodeMapOfStructs(t *testing.T) {
 
 func TestDecodeSimpleSlice(t *testing.T) {
 	etcd := new(test.KeysAPIMock)
-	etcd.On("Get", mock.AnythingOfType("*context.emptyCtx"), "/path/to/some/slice", mock.AnythingOfType("*client.GetOptions")).Return(&client.Response{Node: &client.Node{
+	etcd.On("Get", mock.AnythingOfType("*context.emptyCtx"), "/path/to/slice", mock.AnythingOfType("*client.GetOptions")).Return(&client.Response{Node: &client.Node{
 		Dir:   true,
 		Nodes: []*client.Node{&client.Node{Key: "1"}, &client.Node{Key: "2"}, &client.Node{Key: "3"}},
 	}}, nil)
@@ -190,9 +196,13 @@ func TestDecodeSimpleSlice(t *testing.T) {
 	etcd.On("Get", mock.AnythingOfType("*context.emptyCtx"), "/path/to/slice/2", mock.AnythingOfType("*client.GetOptions")).Return(&client.Response{Node: &client.Node{Value: "30"}}, nil)
 	etcd.On("Get", mock.AnythingOfType("*context.emptyCtx"), "/path/to/slice/3", mock.AnythingOfType("*client.GetOptions")).Return(&client.Response{Node: &client.Node{Value: "50"}}, nil)
 
-	var s []int
+	var s = make([]int, 0)
 
 	decoder := NewDecoder(etcd)
-	err := decoder.Decode("/path/to/some/map", &s)
+	err := decoder.Decode("/path/to/slice", &s)
 	assert.Nil(t, err)
+	assert.Equal(t, 3, len(s))
+	assert.Equal(t, 10, s[0])
+	assert.Equal(t, 30, s[1])
+	assert.Equal(t, 50, s[2])
 }
