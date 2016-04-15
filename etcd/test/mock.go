@@ -20,7 +20,7 @@ func (a *KeysAPIMock) Get(ctx context.Context, key string, opts *client.GetOptio
 }
 
 func (a *KeysAPIMock) Set(ctx context.Context, key, value string, opts *client.SetOptions) (*client.Response, error) {
-	args := a.Called(ctx, key, opts)
+	args := a.Called(ctx, key, value, opts)
 	if r, ok := args.Get(0).(*client.Response); ok {
 		return r, args.Error(1)
 	}

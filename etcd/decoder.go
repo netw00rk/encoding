@@ -10,17 +10,21 @@ import (
 	"golang.org/x/net/context"
 )
 
-type Decoder struct {
+type Decoder interface {
+	Decode(string, interface{}) error
+}
+
+type decoder struct {
 	client client.KeysAPI
 }
 
-func NewDecoder(client client.KeysAPI) *Decoder {
-	return &Decoder{
+func NewDecoder(client client.KeysAPI) Decoder {
+	return &decoder{
 		client: client,
 	}
 }
 
-func (d *Decoder) Decode(path string, v interface{}) error {
+func (d *decoder) Decode(path string, v interface{}) error {
 	value := reflect.ValueOf(v)
 	if value.Kind() != reflect.Ptr {
 		return errors.New("destination has to be a pointer")
@@ -29,7 +33,7 @@ func (d *Decoder) Decode(path string, v interface{}) error {
 	return d.decode(path, value.Elem())
 }
 
-func (d *Decoder) decode(path string, value reflect.Value) error {
+func (d *decoder) decode(path string, value reflect.Value) error {
 	if value.Kind() == reflect.Ptr {
 		value = value.Elem()
 	}
@@ -37,22 +41,26 @@ func (d *Decoder) decode(path string, value reflect.Value) error {
 	switch value.Kind() {
 	case reflect.Func:
 		return errors.New("can't decode func: not implemented")
+
 	case reflect.Chan:
 		return errors.New("can't decode channel: not implemented")
+
 	case reflect.Interface:
 		v := reflect.New(value.Elem().Type()).Elem()
 		d.decode(path, v)
 		value.Set(v)
+
 	case reflect.Struct:
 		if err := d.decodeStruct(path, value); err != nil {
 			return err
 		}
+
 	case reflect.Map:
 		if err := d.decodeMap(path, value); err != nil {
 			return err
 		}
 
-	case reflect.Slice:
+	case reflect.Slice, reflect.Array:
 		if err := d.decodeSlice(path, value); err != nil {
 			return err
 		}
@@ -68,7 +76,7 @@ func (d *Decoder) decode(path string, value reflect.Value) error {
 	return nil
 }
 
-func (d *Decoder) decodeSlice(path string, value reflect.Value) error {
+func (d *decoder) decodeSlice(path string, value reflect.Value) error {
 	r, _ := d.client.Get(context.Background(), path, &client.GetOptions{})
 	if !r.Node.Dir {
 		return errors.New(fmt.Sprintf("%s is not a dir", path))
@@ -83,13 +91,13 @@ func (d *Decoder) decodeSlice(path string, value reflect.Value) error {
 		if err := d.decode(fmt.Sprintf("%s/%s", path, node.Key), sliceValue); err != nil {
 			return err
 		}
-		reflect.Append(value, sliceValue)
+		value.Set(reflect.Append(value, sliceValue))
 	}
 
 	return nil
 }
 
-func (d *Decoder) decodeMap(path string, value reflect.Value) error {
+func (d *decoder) decodeMap(path string, value reflect.Value) error {
 	r, _ := d.client.Get(context.Background(), path, &client.GetOptions{})
 	if !r.Node.Dir {
 		return errors.New(fmt.Sprintf("%s is not a dir", path))
@@ -113,7 +121,7 @@ func (d *Decoder) decodeMap(path string, value reflect.Value) error {
 	return nil
 }
 
-func (d *Decoder) decodeStruct(path string, value reflect.Value) error {
+func (d *decoder) decodeStruct(path string, value reflect.Value) error {
 	for i := 0; i < value.NumField(); i++ {
 		typeField := value.Type().Field(i)
 		name := typeField.Tag.Get("etcd")
@@ -130,12 +138,19 @@ func (d *Decoder) decodeStruct(path string, value reflect.Value) error {
 
 func decodePrimitive(nodeValue string, value reflect.Value) error {
 	switch value.Kind() {
-	case reflect.Int, reflect.Int32, reflect.Int64:
+	case reflect.Int, reflect.Int8, reflect.Int16, reflect.Int32, reflect.Int64:
 		v, err := strconv.ParseInt(nodeValue, 10, 64)
 		if err != nil {
 			return err
 		}
 		value.SetInt(v)
+
+	case reflect.Uint, reflect.Uint8, reflect.Uint16, reflect.Uint32, reflect.Uint64, reflect.Uintptr:
+		v, err := strconv.ParseUint(nodeValue, 10, 64)
+		if err != nil {
+			return err
+		}
+		value.SetUint(v)
 
 	case reflect.Float32, reflect.Float64:
 		v, err := strconv.ParseFloat(nodeValue, 64)
@@ -150,8 +165,10 @@ func decodePrimitive(nodeValue string, value reflect.Value) error {
 			return err
 		}
 		value.SetBool(v)
-	default:
+	case reflect.String:
 		value.SetString(nodeValue)
+	default:
+		return errors.New(fmt.Sprintf("can't decode value of type %s", value.Type()))
 	}
 
 	return nil
