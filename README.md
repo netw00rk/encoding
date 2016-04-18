@@ -1,5 +1,5 @@
 
- library for encoding/decoding data from/to [etcd](https://github.com/coreos/etcd).
+Golang library for encoding/decoding data from/to [etcd](https://github.com/coreos/etcd).
 It supports primitive data types, structs, slices, map with string keys.
 
 ### Usage example
@@ -72,4 +72,5 @@ func main() {
 ```
 
 To skip field during encoding use `etcd:"-"` tag.
+
 To skip missing fields during decoding use decoder.SkipMissing(true) method.;
