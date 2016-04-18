@@ -13,16 +13,22 @@ import (
 
 type Decoder interface {
 	Decode(string, interface{}) error
+	SkipMissing(bool)
 }
 
 type decoder struct {
-	client client.KeysAPI
+	client      client.KeysAPI
+	skipMissing bool
 }
 
 func NewDecoder(client client.KeysAPI) Decoder {
 	return &decoder{
 		client: client,
 	}
+}
+
+func (d *decoder) SkipMissing(skip bool) {
+	d.skipMissing = skip
 }
 
 func (d *decoder) Decode(path string, v interface{}) error {
@@ -69,6 +75,9 @@ func (d *decoder) decode(path string, value reflect.Value) error {
 	default:
 		r, err := d.client.Get(context.Background(), path, &client.GetOptions{})
 		if err != nil {
+			if d.skipMissing && err.(client.Error).Code == client.ErrorCodeKeyNotFound {
+				return nil
+			}
 			return err
 		}
 		return decodePrimitive(r.Node.Value, value)
