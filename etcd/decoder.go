@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"reflect"
 	"strconv"
+	"strings"
 
 	"github.com/coreos/etcd/client"
 	"golang.org/x/net/context"
@@ -88,7 +89,7 @@ func (d *decoder) decodeSlice(path string, value reflect.Value) error {
 
 	for _, node := range r.Node.Nodes {
 		sliceValue := reflect.New(value.Type().Elem()).Elem()
-		if err := d.decode(fmt.Sprintf("%s/%s", path, node.Key), sliceValue); err != nil {
+		if err := d.decode(node.Key, sliceValue); err != nil {
 			return err
 		}
 		value.Set(reflect.Append(value, sliceValue))
@@ -109,12 +110,13 @@ func (d *decoder) decodeMap(path string, value reflect.Value) error {
 
 	for _, node := range r.Node.Nodes {
 		mapValue := reflect.New(value.Type().Elem()).Elem()
-		if err := d.decode(fmt.Sprintf("%s/%s", path, node.Key), mapValue); err != nil {
+		if err := d.decode(node.Key, mapValue); err != nil {
 			return err
 		}
 
 		mapKey := reflect.New(value.Type().Key()).Elem()
-		mapKey.SetString(node.Key)
+		p := strings.Split(node.Key, "/")
+		mapKey.SetString(p[len(p)-1])
 		value.SetMapIndex(mapKey, mapValue)
 	}
 
