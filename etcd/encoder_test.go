@@ -165,3 +165,22 @@ func TestEncodeNotImplementedType(t *testing.T) {
 	err := encoder.Encode("/path", c)
 	assert.Equal(t, "can't encode type chan bool", err.Error())
 }
+
+func TestEncodeIgnoreTag(t *testing.T) {
+	etcd := new(test.KeysAPIMock)
+	etcd.On("Set", mock.AnythingOfType("*context.emptyCtx"), "/path/to/some/struct/field", mock.Anything, mock.AnythingOfType("*client.SetOptions")).Return(&client.Response{}, nil).Run(func(args mock.Arguments) {
+		assert.Equal(t, "10", args.Get(2))
+	})
+
+	var s = struct {
+		Field       int  `etcd:"field"`
+		IgnoreField bool `etcd:"-"`
+	}{
+		Field:       10,
+		IgnoreField: false,
+	}
+
+	encoder := NewEncoder(etcd)
+	err := encoder.Encode("/path/to/some/struct", s)
+	assert.Nil(t, err)
+}

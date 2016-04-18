@@ -66,11 +66,13 @@ func (e *encoder) encodeStruct(path string, value reflect.Value) error {
 	for i := 0; i < value.NumField(); i++ {
 		typeField := value.Type().Field(i)
 		name := typeField.Tag.Get("etcd")
-		if name == "" {
-			name = typeField.Name
-		}
-		if err := e.encode(fmt.Sprintf("%s/%s", path, name), value.Field(i)); err != nil {
-			return err
+		if name != "-" {
+			if name == "" {
+				name = typeField.Name
+			}
+			if err := e.encode(fmt.Sprintf("%s/%s", path, name), value.Field(i)); err != nil {
+				return err
+			}
 		}
 	}
 

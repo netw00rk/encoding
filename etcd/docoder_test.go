@@ -209,3 +209,19 @@ func TestDecodeSimpleSlice(t *testing.T) {
 	assert.Equal(t, 30, s[1])
 	assert.Equal(t, 50, s[2])
 }
+
+func TestDecodeIgnoreTag(t *testing.T) {
+	etcd := new(test.KeysAPIMock)
+	etcd.On("Get", mock.AnythingOfType("*context.emptyCtx"), "/path/to/some/struct/field", mock.AnythingOfType("*client.GetOptions")).Return(&client.Response{Node: &client.Node{Value: "10"}}, nil)
+
+	var s = struct {
+		Field1 int64 `etcd:"field"`
+		Field2 int64 `etcd:"-"`
+	}{}
+
+	decoder := NewDecoder(etcd)
+	err := decoder.Decode("/path/to/some/struct", &s)
+	assert.Nil(t, err)
+	assert.Equal(t, int64(10), s.Field1)
+	assert.Equal(t, int64(0), s.Field2)
+}
