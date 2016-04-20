@@ -75,7 +75,7 @@ func (d *decoder) decode(path string, value reflect.Value) error {
 	default:
 		r, err := d.client.Get(context.Background(), path, &client.GetOptions{})
 		if err != nil {
-			if d.skipMissing && err.(client.Error).Code == client.ErrorCodeKeyNotFound {
+			if e, ok := err.(client.Error); ok && d.skipMissing && e.Code == client.ErrorCodeKeyNotFound {
 				return nil
 			}
 			return err
