@@ -75,7 +75,7 @@ func (d *decoder) decode(path string, value reflect.Value) error {
 	default:
 		r, err := d.client.Get(context.Background(), path, &client.GetOptions{})
 		if err != nil {
-			if e, ok := err.(client.Error); ok && d.skipMissing && e.Code == client.ErrorCodeKeyNotFound {
+			if canSkipMissing(err, d.skipMissing) {
 				return nil
 			}
 			return err
@@ -87,7 +87,14 @@ func (d *decoder) decode(path string, value reflect.Value) error {
 }
 
 func (d *decoder) decodeSlice(path string, value reflect.Value) error {
-	r, _ := d.client.Get(context.Background(), path, &client.GetOptions{})
+	r, err := d.client.Get(context.Background(), path, &client.GetOptions{})
+	if err != nil {
+		if canSkipMissing(err, d.skipMissing) {
+			return nil
+		}
+		return err
+	}
+
 	if !r.Node.Dir {
 		return errors.New(fmt.Sprintf("%s is not a dir", path))
 	}
@@ -108,7 +115,14 @@ func (d *decoder) decodeSlice(path string, value reflect.Value) error {
 }
 
 func (d *decoder) decodeMap(path string, value reflect.Value) error {
-	r, _ := d.client.Get(context.Background(), path, &client.GetOptions{})
+	r, err := d.client.Get(context.Background(), path, &client.GetOptions{})
+	if err != nil {
+		if canSkipMissing(err, d.skipMissing) {
+			return nil
+		}
+		return err
+	}
+
 	if !r.Node.Dir {
 		return errors.New(fmt.Sprintf("%s is not a dir", path))
 	}
@@ -185,4 +199,12 @@ func decodePrimitive(nodeValue string, value reflect.Value) error {
 	}
 
 	return nil
+}
+
+func canSkipMissing(err error, skipFlag bool) bool {
+	if e, ok := err.(client.Error); ok && skipFlag && e.Code == client.ErrorCodeKeyNotFound {
+		return true
+	}
+
+	return false
 }
