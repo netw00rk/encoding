@@ -1,6 +1,7 @@
 package etcd
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"reflect"
@@ -8,11 +9,11 @@ import (
 	"strings"
 
 	"github.com/coreos/etcd/client"
-	"golang.org/x/net/context"
 )
 
 type Decoder interface {
 	Decode(string, interface{}) error
+	DecodeWithContext(string, interface{}, context.Context) error
 	SkipMissing(bool)
 }
 
@@ -32,15 +33,19 @@ func (d *decoder) SkipMissing(skip bool) {
 }
 
 func (d *decoder) Decode(path string, v interface{}) error {
+	return d.DecodeWithContext(path, v, context.Background())
+}
+
+func (d *decoder) DecodeWithContext(path string, v interface{}, ctx context.Context) error {
 	value := reflect.ValueOf(v)
 	if value.Kind() != reflect.Ptr {
 		return errors.New("destination has to be a pointer")
 	}
 
-	return d.decode(path, value.Elem())
+	return d.decode(path, value.Elem(), ctx)
 }
 
-func (d *decoder) decode(path string, value reflect.Value) error {
+func (d *decoder) decode(path string, value reflect.Value, ctx context.Context) error {
 	if value.Kind() == reflect.Ptr {
 		value = value.Elem()
 	}
@@ -54,48 +59,43 @@ func (d *decoder) decode(path string, value reflect.Value) error {
 
 	case reflect.Interface:
 		v := reflect.New(value.Elem().Type()).Elem()
-		d.decode(path, v)
+		d.decode(path, v, ctx)
 		value.Set(v)
 
 	case reflect.Struct:
-		if err := d.decodeStruct(path, value); err != nil {
+		if err := d.decodeStruct(path, value, ctx); err != nil {
 			return err
 		}
 
 	case reflect.Map:
-		if err := d.decodeMap(path, value); err != nil {
+		if err := d.decodeMap(path, value, ctx); err != nil {
 			return err
 		}
 
 	case reflect.Slice, reflect.Array:
-		if err := d.decodeSlice(path, value); err != nil {
+		if err := d.decodeSlice(path, value, ctx); err != nil {
 			return err
 		}
 
 	default:
-		r, err := d.client.Get(context.Background(), path, &client.GetOptions{})
-		if err != nil {
-			if canSkipMissing(err, d.skipMissing) {
-				return nil
-			}
+		node, err := d.getNode(path, ctx)
+		if node == nil {
 			return err
 		}
-		return decodePrimitive(r.Node.Value, value)
+
+		return decodePrimitive(node.Value, value)
 	}
 
 	return nil
 }
 
-func (d *decoder) decodeSlice(path string, value reflect.Value) error {
-	r, err := d.client.Get(context.Background(), path, &client.GetOptions{})
-	if err != nil {
-		if canSkipMissing(err, d.skipMissing) {
-			return nil
-		}
+func (d *decoder) decodeSlice(path string, value reflect.Value, ctx context.Context) error {
+	node, err := d.getNode(path, ctx)
+	if node == nil {
 		return err
 	}
 
-	if !r.Node.Dir {
+	if !node.Dir {
 		return errors.New(fmt.Sprintf("%s is not a dir", path))
 	}
 
@@ -103,9 +103,9 @@ func (d *decoder) decodeSlice(path string, value reflect.Value) error {
 		value.Set(reflect.MakeSlice(value.Type(), value.Len(), value.Cap()))
 	}
 
-	for _, node := range r.Node.Nodes {
+	for _, node := range node.Nodes {
 		sliceValue := reflect.New(value.Type().Elem()).Elem()
-		if err := d.decode(node.Key, sliceValue); err != nil {
+		if err := d.decode(node.Key, sliceValue, ctx); err != nil {
 			return err
 		}
 		value.Set(reflect.Append(value, sliceValue))
@@ -114,16 +114,13 @@ func (d *decoder) decodeSlice(path string, value reflect.Value) error {
 	return nil
 }
 
-func (d *decoder) decodeMap(path string, value reflect.Value) error {
-	r, err := d.client.Get(context.Background(), path, &client.GetOptions{})
-	if err != nil {
-		if canSkipMissing(err, d.skipMissing) {
-			return nil
-		}
+func (d *decoder) decodeMap(path string, value reflect.Value, ctx context.Context) error {
+	node, err := d.getNode(path, ctx)
+	if node == nil {
 		return err
 	}
 
-	if !r.Node.Dir {
+	if !node.Dir {
 		return errors.New(fmt.Sprintf("%s is not a dir", path))
 	}
 
@@ -131,9 +128,9 @@ func (d *decoder) decodeMap(path string, value reflect.Value) error {
 		value.Set(reflect.MakeMap(value.Type()))
 	}
 
-	for _, node := range r.Node.Nodes {
+	for _, node := range node.Nodes {
 		mapValue := reflect.New(value.Type().Elem()).Elem()
-		if err := d.decode(node.Key, mapValue); err != nil {
+		if err := d.decode(node.Key, mapValue, ctx); err != nil {
 			return err
 		}
 
@@ -146,7 +143,7 @@ func (d *decoder) decodeMap(path string, value reflect.Value) error {
 	return nil
 }
 
-func (d *decoder) decodeStruct(path string, value reflect.Value) error {
+func (d *decoder) decodeStruct(path string, value reflect.Value, ctx context.Context) error {
 	for i := 0; i < value.NumField(); i++ {
 		typeField := value.Type().Field(i)
 		name := typeField.Tag.Get("etcd")
@@ -154,13 +151,29 @@ func (d *decoder) decodeStruct(path string, value reflect.Value) error {
 			if name == "" {
 				name = typeField.Name
 			}
-			if err := d.decode(fmt.Sprintf("%s/%s", path, name), value.Field(i)); err != nil {
+			if err := d.decode(fmt.Sprintf("%s/%s", path, name), value.Field(i), ctx); err != nil {
 				return err
 			}
 		}
 	}
 
 	return nil
+}
+
+func (d *decoder) getNode(path string, ctx context.Context) (*client.Node, error) {
+	op, ok := ctx.Value("options").(*client.GetOptions)
+	if !ok {
+		op = &client.GetOptions{}
+	}
+
+	r, err := d.client.Get(ctx, path, op)
+	if err != nil {
+		if canSkipMissing(err, d.skipMissing) {
+			return nil, nil
+		}
+		return nil, err
+	}
+	return r.Node, nil
 }
 
 func decodePrimitive(nodeValue string, value reflect.Value) error {
