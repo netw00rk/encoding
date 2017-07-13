@@ -42,7 +42,6 @@ func (e *encoder) encode(path string, value reflect.Value, ctx context.Context) 
 		return e.encode(path, value.Elem(), ctx)
 
 	case reflect.Struct:
-		e.deleteNode(path, ctx)
 		return e.encodeStruct(path, value, ctx)
 
 	case reflect.Map:
