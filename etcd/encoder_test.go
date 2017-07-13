@@ -54,6 +54,7 @@ func TestEncodeInterface(t *testing.T) {
 
 func TestEncodeSimpleStruct(t *testing.T) {
 	etcd := new(test.KeysAPIMock)
+	etcd.On("Delete", mock.AnythingOfType("*context.emptyCtx"), "/path/to/some/struct", mock.AnythingOfType("*client.DeleteOptions")).Return(nil, nil)
 	etcd.On("Set", mock.AnythingOfType("*context.emptyCtx"), "/path/to/some/struct/Field1", mock.Anything, mock.AnythingOfType("*client.SetOptions")).Return(&client.Response{}, nil).Run(func(args mock.Arguments) {
 		assert.Equal(t, "10", args.Get(2))
 	})

@@ -29,7 +29,7 @@ func (a *KeysAPIMock) Set(ctx context.Context, key, value string, opts *client.S
 }
 
 func (a *KeysAPIMock) Delete(ctx context.Context, key string, opts *client.DeleteOptions) (*client.Response, error) {
-	panic("not implemented")
+	return nil, nil
 }
 
 func (a *KeysAPIMock) Create(ctx context.Context, key, value string) (*client.Response, error) {

@@ -42,12 +42,15 @@ func (e *encoder) encode(path string, value reflect.Value, ctx context.Context) 
 		return e.encode(path, value.Elem(), ctx)
 
 	case reflect.Struct:
+		e.deleteNode(path, ctx)
 		return e.encodeStruct(path, value, ctx)
 
 	case reflect.Map:
+		e.deleteNode(path, ctx)
 		return e.encodeMap(path, value, ctx)
 
 	case reflect.Slice:
+		e.deleteNode(path, ctx)
 		return e.encodeSlice(path, value, ctx)
 
 	case reflect.Ptr:
@@ -108,6 +111,14 @@ func (e *encoder) encodeSlice(path string, value reflect.Value, ctx context.Cont
 		}
 	}
 	return nil
+}
+
+func (e *encoder) deleteNode(path string, ctx context.Context) {
+	opt := &client.DeleteOptions{
+		Recursive: true,
+		Dir:       true,
+	}
+	e.client.Delete(ctx, path, opt)
 }
 
 func valueToString(val reflect.Value) (string, error) {
