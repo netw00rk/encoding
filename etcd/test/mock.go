@@ -1,9 +1,10 @@
 package test
 
 import (
+	"context"
+
 	"github.com/coreos/etcd/client"
 	"github.com/stretchr/testify/mock"
-	"golang.org/x/net/context"
 )
 
 type KeysAPIMock struct {

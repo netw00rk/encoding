@@ -7,6 +7,7 @@ import (
 	"reflect"
 	"strconv"
 	"strings"
+	"time"
 
 	"github.com/coreos/etcd/client"
 )
@@ -179,11 +180,21 @@ func (d *decoder) getNode(path string, ctx context.Context) (*client.Node, error
 func decodePrimitive(nodeValue string, value reflect.Value) error {
 	switch value.Kind() {
 	case reflect.Int, reflect.Int8, reflect.Int16, reflect.Int32, reflect.Int64:
-		v, err := strconv.ParseInt(nodeValue, 10, 64)
-		if err != nil {
-			return err
+		switch value.Interface().(type) {
+		case time.Duration:
+			v, err := time.ParseDuration(nodeValue)
+			if err != nil {
+				return err
+			}
+			value.SetInt(int64(v))
+
+		default:
+			v, err := strconv.ParseInt(nodeValue, 10, 64)
+			if err != nil {
+				return err
+			}
+			value.SetInt(v)
 		}
-		value.SetInt(v)
 
 	case reflect.Uint, reflect.Uint8, reflect.Uint16, reflect.Uint32, reflect.Uint64, reflect.Uintptr:
 		v, err := strconv.ParseUint(nodeValue, 10, 64)

@@ -3,6 +3,7 @@ package etcd
 import (
 	"fmt"
 	"testing"
+	"time"
 
 	"golang.org/x/net/context"
 
@@ -19,12 +20,13 @@ type NestedComplexStruct struct {
 }
 
 type ComplexStruct struct {
-	IntField     int
-	Int64Field   int64
-	Float32Field float32
-	Float64Field float64
-	StringField  string
-	StructField  NestedComplexStruct
+	IntField          int
+	Int64Field        int64
+	Float32Field      float32
+	Float64Field      float64
+	StringField       string
+	StructField       NestedComplexStruct
+	TimeDurationField time.Duration
 }
 
 func getKeysApi() client.KeysAPI {
@@ -53,6 +55,7 @@ func testEncodeStruct(keysApi client.KeysAPI) (*ComplexStruct, error) {
 			},
 			IntSliceField: []int{50, 60},
 		},
+		TimeDurationField: time.Second * 5,
 	}
 
 	encoder := NewEncoder(keysApi)
@@ -78,7 +81,6 @@ func TestIntegrationEncodingDecoding(t *testing.T) {
 	var b *ComplexStruct
 	b, err = testDecodeStruct(keysApi)
 	assert.Nil(t, err)
-
 	assert.EqualValues(t, a, b)
 }
 

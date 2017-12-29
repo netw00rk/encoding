@@ -21,6 +21,7 @@ func TestDecodePrimitiveTypes(t *testing.T) {
 	etcd := new(test.KeysAPIMock)
 	etcd.On("Get", mock.AnythingOfType("*context.emptyCtx"), "/path/to/some/value", mock.AnythingOfType("*client.GetOptions")).Return(&client.Response{Node: &client.Node{Value: "10"}}, nil)
 	etcd.On("Get", mock.AnythingOfType("*context.emptyCtx"), "/path/to/some/value/bool", mock.AnythingOfType("*client.GetOptions")).Return(&client.Response{Node: &client.Node{Value: "false"}}, nil)
+	etcd.On("Get", mock.AnythingOfType("*context.emptyCtx"), "/path/to/some/value/duration", mock.AnythingOfType("*client.GetOptions")).Return(&client.Response{Node: &client.Node{Value: "10s"}}, nil)
 	decoder := NewDecoder(etcd)
 
 	var a int
@@ -54,9 +55,9 @@ func TestDecodePrimitiveTypes(t *testing.T) {
 	assert.Equal(t, false, f)
 
 	var g time.Duration
-	err = decoder.Decode("/path/to/some/value", &g)
+	err = decoder.Decode("/path/to/some/value/duration", &g)
 	assert.Nil(t, err)
-	assert.Equal(t, time.Duration(10), g)
+	assert.Equal(t, time.Second*10, g)
 }
 
 func TestDecodeInterface(t *testing.T) {

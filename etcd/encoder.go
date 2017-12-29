@@ -2,10 +2,8 @@ package etcd
 
 import (
 	"context"
-	"errors"
 	"fmt"
 	"reflect"
-	"strconv"
 
 	//	"golang.org/x/net/context"
 
@@ -121,26 +119,5 @@ func (e *encoder) deleteNode(path string, ctx context.Context) {
 }
 
 func valueToString(val reflect.Value) (string, error) {
-	switch val.Kind() {
-	case reflect.Int, reflect.Int8, reflect.Int16, reflect.Int32, reflect.Int64:
-		return strconv.FormatInt(val.Int(), 10), nil
-
-	case reflect.Uint, reflect.Uint8, reflect.Uint16, reflect.Uint32, reflect.Uint64, reflect.Uintptr:
-		return strconv.FormatUint(val.Uint(), 10), nil
-
-	case reflect.Float32, reflect.Float64:
-		return strconv.FormatFloat(val.Float(), 'g', -1, 64), nil
-
-	case reflect.String:
-		return val.String(), nil
-
-	case reflect.Bool:
-		if val.Bool() {
-			return "true", nil
-		} else {
-			return "false", nil
-		}
-	default:
-		return "", errors.New(fmt.Sprintf("can't encode type %s", val.Type()))
-	}
+	return fmt.Sprint(val), nil
 }
