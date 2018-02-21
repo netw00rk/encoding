@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"log"
 	"reflect"
 	"strconv"
 	"strings"
@@ -19,7 +20,8 @@ type Decoder interface {
 }
 
 type decoder struct {
-	client client.KeysAPI
+	client      client.KeysAPI
+	skipMissing bool
 }
 
 func NewDecoder(client client.KeysAPI) Decoder {
@@ -30,6 +32,7 @@ func NewDecoder(client client.KeysAPI) Decoder {
 
 // Deprecated, use ",omitempty" tag
 func (d *decoder) SkipMissing(skip bool) {
+	log.Println("SkipMissing method is deprecated, use \",omitempty\" tag instead")
 	d.skipMissing = skip
 }
 
@@ -173,6 +176,9 @@ func (d *decoder) getNode(path string, ctx context.Context) (*client.Node, error
 
 	r, err := d.client.Get(ctx, path, op)
 	if err != nil {
+		if canSkipMissing(err, d.skipMissing) {
+			return nil, nil
+		}
 		return nil, err
 	}
 	return r.Node, nil
@@ -232,6 +238,14 @@ func canOmitEmpty(err error, params []string) bool {
 	}
 
 	if e, ok := err.(client.Error); ok && params[1] == "omitempty" && e.Code == client.ErrorCodeKeyNotFound {
+		return true
+	}
+
+	return false
+}
+
+func canSkipMissing(err error, skipFlag bool) bool {
+	if e, ok := err.(client.Error); ok && skipFlag && e.Code == client.ErrorCodeKeyNotFound {
 		return true
 	}
 
