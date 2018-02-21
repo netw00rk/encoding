@@ -19,8 +19,7 @@ type Decoder interface {
 }
 
 type decoder struct {
-	client      client.KeysAPI
-	skipMissing bool
+	client client.KeysAPI
 }
 
 func NewDecoder(client client.KeysAPI) Decoder {
@@ -29,6 +28,7 @@ func NewDecoder(client client.KeysAPI) Decoder {
 	}
 }
 
+// Deprecated, use ",omitempty" tag
 func (d *decoder) SkipMissing(skip bool) {
 	d.skipMissing = skip
 }
@@ -147,13 +147,17 @@ func (d *decoder) decodeMap(path string, value reflect.Value, ctx context.Contex
 func (d *decoder) decodeStruct(path string, value reflect.Value, ctx context.Context) error {
 	for i := 0; i < value.NumField(); i++ {
 		typeField := value.Type().Field(i)
-		name := typeField.Tag.Get("etcd")
-		if name != "-" {
-			if name == "" {
-				name = typeField.Name
+		name := typeField.Name
+		tag := typeField.Tag.Get("etcd")
+		if tag != "-" {
+			params := strings.Split(tag, ",")
+			if len(params) > 0 && params[0] != "" {
+				name = params[0]
 			}
 			if err := d.decode(fmt.Sprintf("%s/%s", path, name), value.Field(i), ctx); err != nil {
-				return err
+				if !canOmitEmpty(err, params) {
+					return err
+				}
 			}
 		}
 	}
@@ -169,9 +173,6 @@ func (d *decoder) getNode(path string, ctx context.Context) (*client.Node, error
 
 	r, err := d.client.Get(ctx, path, op)
 	if err != nil {
-		if canSkipMissing(err, d.skipMissing) {
-			return nil, nil
-		}
 		return nil, err
 	}
 	return r.Node, nil
@@ -225,8 +226,12 @@ func decodePrimitive(nodeValue string, value reflect.Value) error {
 	return nil
 }
 
-func canSkipMissing(err error, skipFlag bool) bool {
-	if e, ok := err.(client.Error); ok && skipFlag && e.Code == client.ErrorCodeKeyNotFound {
+func canOmitEmpty(err error, params []string) bool {
+	if len(params) < 2 {
+		return false
+	}
+
+	if e, ok := err.(client.Error); ok && params[1] == "omitempty" && e.Code == client.ErrorCodeKeyNotFound {
 		return true
 	}
 

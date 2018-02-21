@@ -227,18 +227,17 @@ func TestDecodeIgnoreTag(t *testing.T) {
 	assert.Equal(t, int64(0), s.Field2)
 }
 
-func TestDecodeSkipMissingError(t *testing.T) {
+func TestDecodeOmitEmptyError(t *testing.T) {
 	etcd := new(test.KeysAPIMock)
 	etcd.On("Get", mock.AnythingOfType("*context.emptyCtx"), "/path/to/some/struct/Field", mock.AnythingOfType("*client.GetOptions")).Return(nil, client.Error{Code: client.ErrorCodeKeyNotFound, Message: "Key not found"})
 	etcd.On("Get", mock.AnythingOfType("*context.emptyCtx"), "/path/to/some/struct/Field2", mock.AnythingOfType("*client.GetOptions")).Return(&client.Response{Node: &client.Node{Value: "10"}}, nil)
 
 	var s = struct {
-		Field  int64
+		Field  int64 `etcd:",omitempty"`
 		Field2 int64
 	}{}
 
 	decoder := NewDecoder(etcd)
-	decoder.SkipMissing(true)
 	err := decoder.Decode("/path/to/some/struct", &s)
 	assert.Nil(t, err)
 	assert.Equal(t, s.Field2, int64(10))
