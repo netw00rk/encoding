@@ -72,5 +72,4 @@ func main() {
 ```
 
 To skip field during encoding use `etcd:"-"` tag.
-
-To skip missing fields during decoding use decoder.SkipMissing(true) method.;
+To skip missing fields during decoding use `etcd:",omitempty"` tag;
