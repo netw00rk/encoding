@@ -2,6 +2,8 @@ package etcd
 
 import (
 	"context"
+	"encoding"
+	"encoding/json"
 	"fmt"
 	"reflect"
 
@@ -34,6 +36,15 @@ func (e *encoder) EncodeWithContext(path string, v interface{}, ctx context.Cont
 }
 
 func (e *encoder) encode(path string, value reflect.Value, ctx context.Context) error {
+	if value.Type().NumMethod() > 0 {
+		if u, ok := value.Interface().(json.Marshaler); ok {
+			return e.encodeMarshaler(u, path, ctx)
+		}
+
+		if u, ok := value.Interface().(encoding.TextMarshaler); ok {
+			return e.encodeTextMarshaler(u, path, ctx)
+		}
+	}
 
 	switch value.Kind() {
 	case reflect.Interface:
@@ -59,18 +70,30 @@ func (e *encoder) encode(path string, value reflect.Value, ctx context.Context) 
 			return err
 		}
 
-		op, ok := ctx.Value("options").(*client.SetOptions)
-		if !ok {
-			op = &client.SetOptions{}
-		}
-
-		_, err = e.client.Set(ctx, path, s, op)
-		if err != nil {
+		if err := e.setNode(path, s, ctx); err != nil {
 			return err
 		}
 	}
 
 	return nil
+}
+
+func (e *encoder) encodeMarshaler(u json.Marshaler, path string, ctx context.Context) error {
+	s, err := u.MarshalJSON()
+	if err != nil {
+		return err
+	}
+
+	return e.setNode(path, string(s), ctx)
+}
+
+func (e *encoder) encodeTextMarshaler(u encoding.TextMarshaler, path string, ctx context.Context) error {
+	s, err := u.MarshalText()
+	if err != nil {
+		return err
+	}
+
+	return e.setNode(path, string(s), ctx)
 }
 
 func (e *encoder) encodeStruct(path string, value reflect.Value, ctx context.Context) error {
@@ -116,6 +139,19 @@ func (e *encoder) deleteNode(path string, ctx context.Context) {
 		Dir:       true,
 	}
 	e.client.Delete(ctx, path, opt)
+}
+
+func (e *encoder) setNode(path string, value string, ctx context.Context) error {
+	op, ok := ctx.Value("options").(*client.SetOptions)
+	if !ok {
+		op = &client.SetOptions{}
+	}
+
+	if _, err := e.client.Set(ctx, path, value, op); err != nil {
+		return err
+	}
+
+	return nil
 }
 
 func valueToString(val reflect.Value) (string, error) {

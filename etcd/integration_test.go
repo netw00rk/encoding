@@ -13,6 +13,20 @@ import (
 
 const ETCD_TEST_KEY = "/etcd/integration/test"
 
+type StructWithMarshaller struct {
+	Field string
+}
+
+func (c *StructWithMarshaller) MarshalJSON(data []byte) error {
+	c.Field = string(data)
+	return nil
+}
+
+func (c *StructWithMarshaller) UnmarshalJSON(data []byte) error {
+	c.Field = string(data)
+	return nil
+}
+
 type NestedComplexStruct struct {
 	BooleanField  bool `etcd:"boolean_field"`
 	IntMapField   map[string]int
@@ -27,6 +41,7 @@ type ComplexStruct struct {
 	StringField       string
 	StructField       NestedComplexStruct
 	TimeDurationField time.Duration
+	WithMarshaller    StructWithMarshaller
 }
 
 func getKeysApi() client.KeysAPI {
@@ -56,6 +71,9 @@ func testEncodeStruct(keysApi client.KeysAPI) (*ComplexStruct, error) {
 			IntSliceField: []int{50, 60},
 		},
 		TimeDurationField: time.Second * 5,
+		WithMarshaller: StructWithMarshaller{
+			Field: "foo",
+		},
 	}
 
 	encoder := NewEncoder(keysApi)

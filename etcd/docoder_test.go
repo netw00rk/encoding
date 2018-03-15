@@ -11,6 +11,24 @@ import (
 	"github.com/netw00rk/encoding/etcd/test"
 )
 
+type customJsonUnmarshaler struct {
+	Field string
+}
+
+func (c *customJsonUnmarshaler) UnmarshalJSON(data []byte) error {
+	c.Field = string(data)
+	return nil
+}
+
+type customTextUnmarshaler struct {
+	Field string
+}
+
+func (c *customTextUnmarshaler) UnmarshalText(data []byte) error {
+	c.Field = string(data)
+	return nil
+}
+
 func TestFailIfDestinationIsNotAPointer(t *testing.T) {
 	decoder := NewDecoder(new(test.KeysAPIMock))
 	err := decoder.Decode("/some/path", 10)
@@ -188,6 +206,28 @@ func TestDecodeMapOfStructs(t *testing.T) {
 	assert.Nil(t, err)
 	assert.Equal(t, int64(10), m["field_1"].Field1)
 	assert.Equal(t, int64(30), m["field_2"].Field1)
+}
+
+func TestDecodeJsonUnmarshaller(t *testing.T) {
+	etcd := new(test.KeysAPIMock)
+	etcd.On("Get", mock.AnythingOfType("*context.emptyCtx"), "/path/to/some/custom/Field", mock.AnythingOfType("*client.GetOptions")).Return(&client.Response{Node: &client.Node{Value: "value"}}, nil)
+
+	c := customJsonUnmarshaler{}
+	decoder := NewDecoder(etcd)
+	err := decoder.Decode("/path/to/some/custom", &c)
+	assert.Nil(t, err)
+	assert.Equal(t, "value", c.Field)
+}
+
+func TestDecodeTextUnmarshaller(t *testing.T) {
+	etcd := new(test.KeysAPIMock)
+	etcd.On("Get", mock.AnythingOfType("*context.emptyCtx"), "/path/to/some/custom/Field", mock.AnythingOfType("*client.GetOptions")).Return(&client.Response{Node: &client.Node{Value: "value"}}, nil)
+
+	c := customTextUnmarshaler{}
+	decoder := NewDecoder(etcd)
+	err := decoder.Decode("/path/to/some/custom", &c)
+	assert.Nil(t, err)
+	assert.Equal(t, "value", c.Field)
 }
 
 func TestDecodeSimpleSlice(t *testing.T) {

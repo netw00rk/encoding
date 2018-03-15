@@ -10,6 +10,22 @@ import (
 	"github.com/netw00rk/encoding/etcd/test"
 )
 
+type customJsonMarshaler struct {
+	Field string
+}
+
+func (c *customJsonMarshaler) MarshalJSON() ([]byte, error) {
+	return []byte(c.Field), nil
+}
+
+type customTextMarshaler struct {
+	Field string
+}
+
+func (c *customTextMarshaler) MarshalText() ([]byte, error) {
+	return []byte(c.Field), nil
+}
+
 func TestEncodePrimitiveTypes(t *testing.T) {
 	var actual interface{}
 	etcd := new(test.KeysAPIMock)
@@ -157,6 +173,30 @@ func TestEncodeComplexStruct(t *testing.T) {
 
 	encoder := NewEncoder(etcd)
 	err := encoder.Encode("/path/to/complex/struct", s)
+	assert.Nil(t, err)
+}
+
+func TestEncodeJsonMarshaller(t *testing.T) {
+	etcd := new(test.KeysAPIMock)
+	etcd.On("Set", mock.AnythingOfType("*context.emptyCtx"), "/path/to/custom/Field", mock.Anything, mock.AnythingOfType("*client.SetOptions")).Return(&client.Response{}, nil).Run(func(args mock.Arguments) {
+		assert.Equal(t, "value", args.Get(2))
+	})
+
+	c := customJsonMarshaler{Field: "value"}
+	encoder := NewEncoder(etcd)
+	err := encoder.Encode("/path/to/custom", c)
+	assert.Nil(t, err)
+}
+
+func TestEncodeTextMarshaller(t *testing.T) {
+	etcd := new(test.KeysAPIMock)
+	etcd.On("Set", mock.AnythingOfType("*context.emptyCtx"), "/path/to/custom/Field", mock.Anything, mock.AnythingOfType("*client.SetOptions")).Return(&client.Response{}, nil).Run(func(args mock.Arguments) {
+		assert.Equal(t, "value", args.Get(2))
+	})
+
+	c := customTextMarshaler{Field: "value"}
+	encoder := NewEncoder(etcd)
+	err := encoder.Encode("/path/to/custom", c)
 	assert.Nil(t, err)
 }
 

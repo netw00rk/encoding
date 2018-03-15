@@ -2,6 +2,8 @@ package etcd
 
 import (
 	"context"
+	"encoding"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"log"
@@ -54,6 +56,16 @@ func (d *decoder) decode(path string, value reflect.Value, ctx context.Context) 
 		value = value.Elem()
 	}
 
+	if value.Type().NumMethod() > 0 {
+		if u, ok := value.Interface().(json.Unmarshaler); ok {
+			return d.decodeUnmarshaler(u, path, ctx)
+		}
+
+		if u, ok := value.Interface().(encoding.TextUnmarshaler); ok {
+			return d.decodeTextUnmarshaler(u, path, ctx)
+		}
+	}
+
 	switch value.Kind() {
 	case reflect.Func:
 		return errors.New("can't decode func: not implemented")
@@ -91,6 +103,24 @@ func (d *decoder) decode(path string, value reflect.Value, ctx context.Context) 
 	}
 
 	return nil
+}
+
+func (d *decoder) decodeUnmarshaler(u json.Unmarshaler, path string, ctx context.Context) error {
+	node, err := d.getNode(path, ctx)
+	if node == nil {
+		return err
+	}
+
+	return u.UnmarshalJSON([]byte(node.Value))
+}
+
+func (d *decoder) decodeTextUnmarshaler(u encoding.TextUnmarshaler, path string, ctx context.Context) error {
+	node, err := d.getNode(path, ctx)
+	if node == nil {
+		return err
+	}
+
+	return u.UnmarshalText([]byte(node.Value))
 }
 
 func (d *decoder) decodeSlice(path string, value reflect.Value, ctx context.Context) error {
