@@ -10,6 +10,20 @@ import (
     "github.com/netw00rk/encoding/etcd"
 )
 
+type StructWithMarshaller struct {
+	Field string
+}
+
+func (c *StructWithMarshaller) MarshalJSON(data []byte) error {
+	c.Field = string(data)
+	return nil
+}
+
+func (c *StructWithMarshaller) UnmarshalJSON(data []byte) error {
+	c.Field = string(data)
+	return nil
+}
+
 type NestedComplexStruct struct {
 	BooleanField  bool `etcd:"boolean_field"`
 	IntMapField   map[string]int
@@ -17,12 +31,14 @@ type NestedComplexStruct struct {
 }
 
 type ComplexStruct struct {
-	IntField     int
-	Int64Field   int64
-	Float32Field float32
-	Float64Field float64
-	StringField  string
-	StructField  NestedComplexStruct
+	IntField          int
+	Int64Field        int64
+	Float32Field      float32
+	Float64Field      float64
+	StringField       string
+	StructField       NestedComplexStruct
+	TimeDurationField time.Duration
+	WithMarshaller    StructWithMarshaller
 }
 
 func main() {
@@ -41,6 +57,10 @@ func main() {
 				"field_2": 40,
 			},
 			IntSliceField: []int{50, 60},
+		},
+		TimeDurationField: time.Second * 5,
+		WithMarshaller: StructWithMarshaller{
+			Field: "foo",
 		},
 	}
 
@@ -61,6 +81,7 @@ func main() {
     // /path/to/struct/StructField/IntMapField/field_2 = "40"
     // /path/to/struct/StructField/IntSliceField/0 = "50"
     // /path/to/struct/StructField/IntSliceField/1 = "60"
+    // /path/to/struct/WithMarshaller/Field/ = "foo"
 
     var b = new(ComplexStruct)
     decoder := etcd.Decoder(keysApi)
