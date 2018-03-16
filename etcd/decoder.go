@@ -51,19 +51,47 @@ func (d *decoder) DecodeWithContext(path string, v interface{}, ctx context.Cont
 	return d.decode(path, value.Elem(), ctx)
 }
 
-func (d *decoder) decode(path string, value reflect.Value, ctx context.Context) error {
-	if value.Kind() == reflect.Ptr {
-		value = value.Elem()
+func (d *decoder) indirect(v reflect.Value) (json.Unmarshaler, encoding.TextUnmarshaler, reflect.Value) {
+	if v.Kind() != reflect.Ptr && v.Type().Name() != "" && v.CanAddr() {
+		v = v.Addr()
 	}
 
-	if value.Type().NumMethod() > 0 {
-		if u, ok := value.Interface().(json.Unmarshaler); ok {
-			return d.decodeUnmarshaler(u, path, ctx)
+	for {
+		if v.Kind() == reflect.Interface && !v.IsNil() {
+			e := v.Elem()
+			if e.Kind() == reflect.Ptr && !e.IsNil() && e.Elem().Kind() == reflect.Ptr {
+				v = e
+				continue
+			}
 		}
 
-		if u, ok := value.Interface().(encoding.TextUnmarshaler); ok {
-			return d.decodeTextUnmarshaler(u, path, ctx)
+		if v.Kind() != reflect.Ptr {
+			break
 		}
+		if v.IsNil() {
+			v.Set(reflect.New(v.Type().Elem()))
+		}
+		if v.Type().NumMethod() > 0 {
+			if u, ok := v.Interface().(json.Unmarshaler); ok {
+				return u, nil, reflect.Value{}
+			}
+			if u, ok := v.Interface().(encoding.TextUnmarshaler); ok {
+				return nil, u, reflect.Value{}
+			}
+		}
+		v = v.Elem()
+	}
+	return nil, nil, v
+}
+
+func (d *decoder) decode(path string, value reflect.Value, ctx context.Context) error {
+	u, tu, value := d.indirect(value)
+	if u != nil {
+		return d.decodeUnmarshaler(u, path, ctx)
+	}
+
+	if tu != nil {
+		return d.decodeTextUnmarshaler(tu, path, ctx)
 	}
 
 	switch value.Kind() {
@@ -72,6 +100,9 @@ func (d *decoder) decode(path string, value reflect.Value, ctx context.Context) 
 
 	case reflect.Chan:
 		return errors.New("can't decode channel: not implemented")
+
+	case reflect.Ptr:
+		d.decode(path, value.Elem(), ctx)
 
 	case reflect.Interface:
 		v := reflect.New(value.Elem().Type()).Elem()

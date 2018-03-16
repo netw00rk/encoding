@@ -12,6 +12,11 @@ import (
 	"github.com/coreos/etcd/client"
 )
 
+var (
+	jsonMarshalerType = reflect.TypeOf(new(json.Marshaler)).Elem()
+	textMarshalerType = reflect.TypeOf(new(encoding.TextMarshaler)).Elem()
+)
+
 type Encoder interface {
 	Encode(string, interface{}) error
 	EncodeWithContext(string, interface{}, context.Context) error
@@ -35,15 +40,42 @@ func (e *encoder) EncodeWithContext(path string, v interface{}, ctx context.Cont
 	return e.encode(path, reflect.ValueOf(v), ctx)
 }
 
-func (e *encoder) encode(path string, value reflect.Value, ctx context.Context) error {
-	if value.Type().NumMethod() > 0 {
-		if u, ok := value.Interface().(json.Marshaler); ok {
-			return e.encodeMarshaler(u, path, ctx)
-		}
+func (e *encoder) indirect(v reflect.Value) (json.Marshaler, encoding.TextMarshaler) {
+	t := v.Type()
+	if t.Implements(jsonMarshalerType) {
+		return v.Interface().(json.Marshaler), nil
+	}
 
-		if u, ok := value.Interface().(encoding.TextMarshaler); ok {
-			return e.encodeTextMarshaler(u, path, ctx)
+	if t.Kind() != reflect.Ptr && v.CanAddr() {
+		if reflect.PtrTo(t).Implements(jsonMarshalerType) {
+			return v.Interface().(json.Marshaler), nil
 		}
+	}
+
+	if t.Implements(textMarshalerType) {
+		return nil, v.Interface().(encoding.TextMarshaler)
+	}
+
+	if t.Kind() != reflect.Ptr && v.CanAddr() {
+		if reflect.PtrTo(t).Implements(textMarshalerType) {
+			va := v.Addr()
+			if !va.IsNil() {
+				return nil, v.Interface().(encoding.TextMarshaler)
+			}
+		}
+	}
+
+	return nil, nil
+}
+
+func (e *encoder) encode(path string, value reflect.Value, ctx context.Context) error {
+	m, tm := e.indirect(value)
+	if m != nil {
+		return e.encodeMarshaler(m, path, ctx)
+	}
+
+	if tm != nil {
+		return e.encodeTextMarshaler(tm, path, ctx)
 	}
 
 	switch value.Kind() {

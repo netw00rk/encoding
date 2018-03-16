@@ -17,9 +17,8 @@ type StructWithMarshaller struct {
 	Field string
 }
 
-func (c *StructWithMarshaller) MarshalJSON(data []byte) error {
-	c.Field = string(data)
-	return nil
+func (c StructWithMarshaller) MarshalJSON() ([]byte, error) {
+	return []byte(c.Field), nil
 }
 
 func (c *StructWithMarshaller) UnmarshalJSON(data []byte) error {

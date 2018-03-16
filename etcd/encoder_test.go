@@ -14,16 +14,16 @@ type customJsonMarshaler struct {
 	Field string
 }
 
-func (c *customJsonMarshaler) MarshalJSON() ([]byte, error) {
-	return []byte(c.Field), nil
+func (c customJsonMarshaler) MarshalJSON() ([]byte, error) {
+	return []byte("marshalled:" + c.Field), nil
 }
 
 type customTextMarshaler struct {
 	Field string
 }
 
-func (c *customTextMarshaler) MarshalText() ([]byte, error) {
-	return []byte(c.Field), nil
+func (c customTextMarshaler) MarshalText() ([]byte, error) {
+	return []byte("marshalled:" + c.Field), nil
 }
 
 func TestEncodePrimitiveTypes(t *testing.T) {
@@ -178,11 +178,11 @@ func TestEncodeComplexStruct(t *testing.T) {
 
 func TestEncodeJsonMarshaller(t *testing.T) {
 	etcd := new(test.KeysAPIMock)
-	etcd.On("Set", mock.AnythingOfType("*context.emptyCtx"), "/path/to/custom/Field", mock.Anything, mock.AnythingOfType("*client.SetOptions")).Return(&client.Response{}, nil).Run(func(args mock.Arguments) {
-		assert.Equal(t, "value", args.Get(2))
+	etcd.On("Set", mock.AnythingOfType("*context.emptyCtx"), "/path/to/custom", mock.Anything, mock.AnythingOfType("*client.SetOptions")).Return(&client.Response{}, nil).Run(func(args mock.Arguments) {
+		assert.Equal(t, "marshalled:value", args.Get(2))
 	})
 
-	c := customJsonMarshaler{Field: "value"}
+	c := &customJsonMarshaler{Field: "value"}
 	encoder := NewEncoder(etcd)
 	err := encoder.Encode("/path/to/custom", c)
 	assert.Nil(t, err)
@@ -190,11 +190,11 @@ func TestEncodeJsonMarshaller(t *testing.T) {
 
 func TestEncodeTextMarshaller(t *testing.T) {
 	etcd := new(test.KeysAPIMock)
-	etcd.On("Set", mock.AnythingOfType("*context.emptyCtx"), "/path/to/custom/Field", mock.Anything, mock.AnythingOfType("*client.SetOptions")).Return(&client.Response{}, nil).Run(func(args mock.Arguments) {
-		assert.Equal(t, "value", args.Get(2))
+	etcd.On("Set", mock.AnythingOfType("*context.emptyCtx"), "/path/to/custom", mock.Anything, mock.AnythingOfType("*client.SetOptions")).Return(&client.Response{}, nil).Run(func(args mock.Arguments) {
+		assert.Equal(t, "marshalled:value", args.Get(2))
 	})
 
-	c := customTextMarshaler{Field: "value"}
+	c := &customTextMarshaler{Field: "value"}
 	encoder := NewEncoder(etcd)
 	err := encoder.Encode("/path/to/custom", c)
 	assert.Nil(t, err)

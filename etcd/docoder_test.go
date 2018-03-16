@@ -16,7 +16,7 @@ type customJsonUnmarshaler struct {
 }
 
 func (c *customJsonUnmarshaler) UnmarshalJSON(data []byte) error {
-	c.Field = string(data)
+	c.Field = "unmarshalled:" + string(data)
 	return nil
 }
 
@@ -25,7 +25,7 @@ type customTextUnmarshaler struct {
 }
 
 func (c *customTextUnmarshaler) UnmarshalText(data []byte) error {
-	c.Field = string(data)
+	c.Field = "unmarshalled:" + string(data)
 	return nil
 }
 
@@ -210,24 +210,26 @@ func TestDecodeMapOfStructs(t *testing.T) {
 
 func TestDecodeJsonUnmarshaller(t *testing.T) {
 	etcd := new(test.KeysAPIMock)
-	etcd.On("Get", mock.AnythingOfType("*context.emptyCtx"), "/path/to/some/custom/Field", mock.AnythingOfType("*client.GetOptions")).Return(&client.Response{Node: &client.Node{Value: "value"}}, nil)
+	etcd.On("Get", mock.AnythingOfType("*context.emptyCtx"), "/path/to/some/custom", mock.AnythingOfType("*client.GetOptions")).Return(&client.Response{Node: &client.Node{Value: "value"}}, nil)
 
-	c := customJsonUnmarshaler{}
+	c := new(customJsonUnmarshaler)
+	c.UnmarshalJSON([]byte("hello"))
 	decoder := NewDecoder(etcd)
 	err := decoder.Decode("/path/to/some/custom", &c)
 	assert.Nil(t, err)
-	assert.Equal(t, "value", c.Field)
+	assert.Equal(t, "unmarshalled:value", c.Field)
 }
 
 func TestDecodeTextUnmarshaller(t *testing.T) {
+
 	etcd := new(test.KeysAPIMock)
-	etcd.On("Get", mock.AnythingOfType("*context.emptyCtx"), "/path/to/some/custom/Field", mock.AnythingOfType("*client.GetOptions")).Return(&client.Response{Node: &client.Node{Value: "value"}}, nil)
+	etcd.On("Get", mock.AnythingOfType("*context.emptyCtx"), "/path/to/some/custom", mock.AnythingOfType("*client.GetOptions")).Return(&client.Response{Node: &client.Node{Value: "value"}}, nil)
 
 	c := customTextUnmarshaler{}
 	decoder := NewDecoder(etcd)
 	err := decoder.Decode("/path/to/some/custom", &c)
 	assert.Nil(t, err)
-	assert.Equal(t, "value", c.Field)
+	assert.Equal(t, "unmarshalled:value", c.Field)
 }
 
 func TestDecodeSimpleSlice(t *testing.T) {
