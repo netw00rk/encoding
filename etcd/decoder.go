@@ -201,7 +201,7 @@ func (d *decoder) decodeMap(path string, value reflect.Value, ctx context.Contex
 
 		mapKey := reflect.New(value.Type().Key()).Elem()
 		p := strings.Split(node.Key, "/")
-		mapKey.SetString(p[len(p)-1])
+		decodePrimitive(p[len(p)-1], mapKey)
 		value.SetMapIndex(mapKey, mapValue)
 	}
 

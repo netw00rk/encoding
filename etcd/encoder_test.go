@@ -126,6 +126,25 @@ func TestEncodeMap(t *testing.T) {
 	assert.Nil(t, err)
 }
 
+func TestEncodeMapWithIntKeys(t *testing.T) {
+	etcd := new(test.KeysAPIMock)
+	etcd.On("Set", mock.AnythingOfType("*context.emptyCtx"), "/path/to/some/map/10", mock.Anything, mock.AnythingOfType("*client.SetOptions")).Return(&client.Response{}, nil).Run(func(args mock.Arguments) {
+		assert.Equal(t, "10", args.Get(2))
+	})
+	etcd.On("Set", mock.AnythingOfType("*context.emptyCtx"), "/path/to/some/map/20", mock.Anything, mock.AnythingOfType("*client.SetOptions")).Return(&client.Response{}, nil).Run(func(args mock.Arguments) {
+		assert.Equal(t, "20", args.Get(2))
+	})
+
+	var m = map[int]int{
+		10: 10,
+		20: 20,
+	}
+
+	encoder := NewEncoder(etcd)
+	err := encoder.Encode("/path/to/some/map", m)
+	assert.Nil(t, err)
+}
+
 func TestEncodeSlice(t *testing.T) {
 	etcd := new(test.KeysAPIMock)
 	etcd.On("Set", mock.AnythingOfType("*context.emptyCtx"), "/path/to/some/slice/0", mock.Anything, mock.AnythingOfType("*client.SetOptions")).Return(&client.Response{}, nil).Run(func(args mock.Arguments) {

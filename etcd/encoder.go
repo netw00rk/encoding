@@ -148,7 +148,11 @@ func (e *encoder) encodeStruct(path string, value reflect.Value, ctx context.Con
 func (e *encoder) encodeMap(path string, value reflect.Value, ctx context.Context) error {
 	for _, key := range value.MapKeys() {
 		v := value.MapIndex(key)
-		if err := e.encode(fmt.Sprintf("%s/%s", path, key.String()), v, ctx); err != nil {
+		strKey, err := valueToString(key)
+		if err != nil {
+			return err
+		}
+		if err := e.encode(fmt.Sprintf("%s/%s", path, strKey), v, ctx); err != nil {
 			return err
 		}
 	}

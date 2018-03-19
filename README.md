@@ -80,7 +80,7 @@ func main() {
     // /path/to/struct/StructField/IntMapField/field_2 = "40"
     // /path/to/struct/StructField/IntSliceField/0 = "50"
     // /path/to/struct/StructField/IntSliceField/1 = "60"
-    // /path/to/struct/WithMarshaller/Field/ = "foo"
+    // /path/to/struct/WithMarshaller = "foo"
 
     var b = new(ComplexStruct)
     decoder := etcd.Decoder(keysApi)

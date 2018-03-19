@@ -157,7 +157,7 @@ func TestDecodeSimpleMap(t *testing.T) {
 		Nodes: []*client.Node{&client.Node{Key: "/path/to/some/struct/field_1"}, &client.Node{Key: "/path/to/some/struct/field_2"}},
 	}}, nil)
 	etcd.On("Get", mock.AnythingOfType("*context.emptyCtx"), "/path/to/some/struct/field_1", mock.AnythingOfType("*client.GetOptions")).Return(&client.Response{Node: &client.Node{Value: "10"}}, nil)
-	etcd.On("Get", mock.AnythingOfType("*context.emptyCtx"), "/path/to/some/struct/field_2", mock.AnythingOfType("*client.GetOptions")).Return(&client.Response{Node: &client.Node{Value: "30"}}, nil)
+	etcd.On("Get", mock.AnythingOfType("*context.emptyCtx"), "/path/to/some/struct/field_2", mock.AnythingOfType("*client.GetOptions")).Return(&client.Response{Node: &client.Node{Value: "20"}}, nil)
 
 	var m map[string]int
 
@@ -165,7 +165,25 @@ func TestDecodeSimpleMap(t *testing.T) {
 	err := decoder.Decode("/path/to/some/struct", &m)
 	assert.Nil(t, err)
 	assert.Equal(t, 10, m["field_1"])
-	assert.Equal(t, 30, m["field_2"])
+	assert.Equal(t, 20, m["field_2"])
+}
+
+func TestDecodeMapWithIntKeys(t *testing.T) {
+	etcd := new(test.KeysAPIMock)
+	etcd.On("Get", mock.AnythingOfType("*context.emptyCtx"), "/path/to/some/struct", mock.AnythingOfType("*client.GetOptions")).Return(&client.Response{Node: &client.Node{
+		Dir:   true,
+		Nodes: []*client.Node{&client.Node{Key: "/path/to/some/struct/10"}, &client.Node{Key: "/path/to/some/struct/20"}},
+	}}, nil)
+	etcd.On("Get", mock.AnythingOfType("*context.emptyCtx"), "/path/to/some/struct/10", mock.AnythingOfType("*client.GetOptions")).Return(&client.Response{Node: &client.Node{Value: "10"}}, nil)
+	etcd.On("Get", mock.AnythingOfType("*context.emptyCtx"), "/path/to/some/struct/20", mock.AnythingOfType("*client.GetOptions")).Return(&client.Response{Node: &client.Node{Value: "20"}}, nil)
+
+	var m map[int]int
+
+	decoder := NewDecoder(etcd)
+	err := decoder.Decode("/path/to/some/struct", &m)
+	assert.Nil(t, err)
+	assert.Equal(t, 10, m[10])
+	assert.Equal(t, 20, m[20])
 }
 
 func TestDecodeSimpleMapInsideStruct(t *testing.T) {
