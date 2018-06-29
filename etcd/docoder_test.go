@@ -93,9 +93,14 @@ func TestDecodeInterface(t *testing.T) {
 
 func TestDecodeStruct(t *testing.T) {
 	etcd := new(test.KeysAPIMock)
-	etcd.On("Get", mock.AnythingOfType("*context.emptyCtx"), "/path/to/some/struct/Field1", mock.AnythingOfType("*client.GetOptions")).Return(&client.Response{Node: &client.Node{Value: "10"}}, nil)
-	etcd.On("Get", mock.AnythingOfType("*context.emptyCtx"), "/path/to/some/struct/Field2", mock.AnythingOfType("*client.GetOptions")).Return(&client.Response{Node: &client.Node{Value: "string"}}, nil)
-	etcd.On("Get", mock.AnythingOfType("*context.emptyCtx"), "/path/to/some/struct/Field3", mock.AnythingOfType("*client.GetOptions")).Return(&client.Response{Node: &client.Node{Value: "true"}}, nil)
+	etcd.On("Get", mock.AnythingOfType("*context.emptyCtx"), "/path/to/some/struct", mock.AnythingOfType("*client.GetOptions")).Return(&client.Response{Node: &client.Node{
+		Dir: true,
+		Nodes: []*client.Node{
+			&client.Node{Key: "/path/to/some/struct/Field1", Value: "10"},
+			&client.Node{Key: "/path/to/some/struct/Field2", Value: "string"},
+			&client.Node{Key: "/path/to/some/struct/Field3", Value: "true"},
+		},
+	}}, nil)
 
 	var s = struct {
 		Field1 int64
@@ -113,9 +118,20 @@ func TestDecodeStruct(t *testing.T) {
 
 func TestDecodeNestedStruct(t *testing.T) {
 	etcd := new(test.KeysAPIMock)
-	etcd.On("Get", mock.AnythingOfType("*context.emptyCtx"), "/path/to/some/struct/Field1", mock.AnythingOfType("*client.GetOptions")).Return(&client.Response{Node: &client.Node{Value: "10"}}, nil)
-	etcd.On("Get", mock.AnythingOfType("*context.emptyCtx"), "/path/to/some/struct/Field2/Field1", mock.AnythingOfType("*client.GetOptions")).Return(&client.Response{Node: &client.Node{Value: "string"}}, nil)
-	etcd.On("Get", mock.AnythingOfType("*context.emptyCtx"), "/path/to/some/struct/Field2/Field2", mock.AnythingOfType("*client.GetOptions")).Return(&client.Response{Node: &client.Node{Value: "true"}}, nil)
+	etcd.On("Get", mock.AnythingOfType("*context.emptyCtx"), "/path/to/some/struct", mock.AnythingOfType("*client.GetOptions")).Return(&client.Response{Node: &client.Node{
+		Dir: true,
+		Nodes: []*client.Node{
+			&client.Node{Key: "/path/to/some/struct/Field1", Value: "10"},
+			&client.Node{Key: "/path/to/some/struct/Field2", Dir: true},
+		},
+	}}, nil)
+	etcd.On("Get", mock.AnythingOfType("*context.emptyCtx"), "/path/to/some/struct/Field2", mock.AnythingOfType("*client.GetOptions")).Return(&client.Response{Node: &client.Node{
+		Dir: true,
+		Nodes: []*client.Node{
+			&client.Node{Key: "/path/to/some/struct/Field2/Field1", Value: "string"},
+			&client.Node{Key: "/path/to/some/struct/Field2/Field2", Value: "true"},
+		},
+	}}, nil)
 
 	var s = struct {
 		Field1 int64
@@ -135,8 +151,13 @@ func TestDecodeNestedStruct(t *testing.T) {
 
 func TestDecodeStructWithTag(t *testing.T) {
 	etcd := new(test.KeysAPIMock)
-	etcd.On("Get", mock.AnythingOfType("*context.emptyCtx"), "/path/to/some/struct/field_1", mock.AnythingOfType("*client.GetOptions")).Return(&client.Response{Node: &client.Node{Value: "10"}}, nil)
-	etcd.On("Get", mock.AnythingOfType("*context.emptyCtx"), "/path/to/some/struct/Field2", mock.AnythingOfType("*client.GetOptions")).Return(&client.Response{Node: &client.Node{Value: "20"}}, nil)
+	etcd.On("Get", mock.AnythingOfType("*context.emptyCtx"), "/path/to/some/struct", mock.AnythingOfType("*client.GetOptions")).Return(&client.Response{Node: &client.Node{
+		Dir: true,
+		Nodes: []*client.Node{
+			&client.Node{Key: "/path/to/some/struct/field_1", Value: "10"},
+			&client.Node{Key: "/path/to/some/struct/Field2", Value: "20"},
+		},
+	}}, nil)
 
 	var s = struct {
 		Field1 int64 `etcd:"field_1"`
@@ -154,10 +175,8 @@ func TestDecodeSimpleMap(t *testing.T) {
 	etcd := new(test.KeysAPIMock)
 	etcd.On("Get", mock.AnythingOfType("*context.emptyCtx"), "/path/to/some/struct", mock.AnythingOfType("*client.GetOptions")).Return(&client.Response{Node: &client.Node{
 		Dir:   true,
-		Nodes: []*client.Node{&client.Node{Key: "/path/to/some/struct/field_1"}, &client.Node{Key: "/path/to/some/struct/field_2"}},
+		Nodes: []*client.Node{&client.Node{Key: "/path/to/some/struct/field_1", Value: "10"}, &client.Node{Key: "/path/to/some/struct/field_2", Value: "20"}},
 	}}, nil)
-	etcd.On("Get", mock.AnythingOfType("*context.emptyCtx"), "/path/to/some/struct/field_1", mock.AnythingOfType("*client.GetOptions")).Return(&client.Response{Node: &client.Node{Value: "10"}}, nil)
-	etcd.On("Get", mock.AnythingOfType("*context.emptyCtx"), "/path/to/some/struct/field_2", mock.AnythingOfType("*client.GetOptions")).Return(&client.Response{Node: &client.Node{Value: "20"}}, nil)
 
 	var m map[string]int
 
@@ -172,10 +191,8 @@ func TestDecodeMapWithIntKeys(t *testing.T) {
 	etcd := new(test.KeysAPIMock)
 	etcd.On("Get", mock.AnythingOfType("*context.emptyCtx"), "/path/to/some/struct", mock.AnythingOfType("*client.GetOptions")).Return(&client.Response{Node: &client.Node{
 		Dir:   true,
-		Nodes: []*client.Node{&client.Node{Key: "/path/to/some/struct/10"}, &client.Node{Key: "/path/to/some/struct/20"}},
+		Nodes: []*client.Node{&client.Node{Key: "/path/to/some/struct/10", Value: "10"}, &client.Node{Key: "/path/to/some/struct/20", Value: "20"}},
 	}}, nil)
-	etcd.On("Get", mock.AnythingOfType("*context.emptyCtx"), "/path/to/some/struct/10", mock.AnythingOfType("*client.GetOptions")).Return(&client.Response{Node: &client.Node{Value: "10"}}, nil)
-	etcd.On("Get", mock.AnythingOfType("*context.emptyCtx"), "/path/to/some/struct/20", mock.AnythingOfType("*client.GetOptions")).Return(&client.Response{Node: &client.Node{Value: "20"}}, nil)
 
 	var m map[int]int
 
@@ -188,12 +205,16 @@ func TestDecodeMapWithIntKeys(t *testing.T) {
 
 func TestDecodeSimpleMapInsideStruct(t *testing.T) {
 	etcd := new(test.KeysAPIMock)
+	etcd.On("Get", mock.AnythingOfType("*context.emptyCtx"), "/path/to/some/struct", mock.AnythingOfType("*client.GetOptions")).Return(&client.Response{Node: &client.Node{
+		Dir: true,
+		Nodes: []*client.Node{
+			&client.Node{Key: "/path/to/some/struct/Map", Dir: true},
+		},
+	}}, nil)
 	etcd.On("Get", mock.AnythingOfType("*context.emptyCtx"), "/path/to/some/struct/Map", mock.AnythingOfType("*client.GetOptions")).Return(&client.Response{Node: &client.Node{
 		Dir:   true,
-		Nodes: []*client.Node{&client.Node{Key: "/path/to/some/struct/Map/field_1"}, &client.Node{Key: "/path/to/some/struct/Map/field_2"}},
+		Nodes: []*client.Node{&client.Node{Key: "/path/to/some/struct/Map/field_1", Value: "10"}, &client.Node{Key: "/path/to/some/struct/Map/field_2", Value: "30"}},
 	}}, nil)
-	etcd.On("Get", mock.AnythingOfType("*context.emptyCtx"), "/path/to/some/struct/Map/field_1", mock.AnythingOfType("*client.GetOptions")).Return(&client.Response{Node: &client.Node{Value: "10"}}, nil)
-	etcd.On("Get", mock.AnythingOfType("*context.emptyCtx"), "/path/to/some/struct/Map/field_2", mock.AnythingOfType("*client.GetOptions")).Return(&client.Response{Node: &client.Node{Value: "30"}}, nil)
 
 	var s = struct {
 		Map map[string]int
@@ -210,10 +231,20 @@ func TestDecodeMapOfStructs(t *testing.T) {
 	etcd := new(test.KeysAPIMock)
 	etcd.On("Get", mock.AnythingOfType("*context.emptyCtx"), "/path/to/some/map", mock.AnythingOfType("*client.GetOptions")).Return(&client.Response{Node: &client.Node{
 		Dir:   true,
-		Nodes: []*client.Node{&client.Node{Key: "/path/to/some/map/field_1"}, &client.Node{Key: "/path/to/some/map/field_2"}},
+		Nodes: []*client.Node{&client.Node{Key: "/path/to/some/map/field_1", Dir: true}, &client.Node{Key: "/path/to/some/map/field_2", Dir: true}},
 	}}, nil)
-	etcd.On("Get", mock.AnythingOfType("*context.emptyCtx"), "/path/to/some/map/field_1/Field1", mock.AnythingOfType("*client.GetOptions")).Return(&client.Response{Node: &client.Node{Value: "10"}}, nil)
-	etcd.On("Get", mock.AnythingOfType("*context.emptyCtx"), "/path/to/some/map/field_2/Field1", mock.AnythingOfType("*client.GetOptions")).Return(&client.Response{Node: &client.Node{Value: "30"}}, nil)
+	etcd.On("Get", mock.AnythingOfType("*context.emptyCtx"), "/path/to/some/map/field_1", mock.AnythingOfType("*client.GetOptions")).Return(&client.Response{Node: &client.Node{
+		Dir: true,
+		Nodes: []*client.Node{
+			&client.Node{Key: "/path/to/some/struct/field_1/Field1", Value: "10"},
+		},
+	}}, nil)
+	etcd.On("Get", mock.AnythingOfType("*context.emptyCtx"), "/path/to/some/map/field_2", mock.AnythingOfType("*client.GetOptions")).Return(&client.Response{Node: &client.Node{
+		Dir: true,
+		Nodes: []*client.Node{
+			&client.Node{Key: "/path/to/some/struct/field_1/Field1", Value: "30"},
+		},
+	}}, nil)
 
 	var m map[string]struct {
 		Field1 int64
@@ -239,7 +270,6 @@ func TestDecodeJsonUnmarshaller(t *testing.T) {
 }
 
 func TestDecodeTextUnmarshaller(t *testing.T) {
-
 	etcd := new(test.KeysAPIMock)
 	etcd.On("Get", mock.AnythingOfType("*context.emptyCtx"), "/path/to/some/custom", mock.AnythingOfType("*client.GetOptions")).Return(&client.Response{Node: &client.Node{Value: "value"}}, nil)
 
@@ -253,12 +283,13 @@ func TestDecodeTextUnmarshaller(t *testing.T) {
 func TestDecodeSimpleSlice(t *testing.T) {
 	etcd := new(test.KeysAPIMock)
 	etcd.On("Get", mock.AnythingOfType("*context.emptyCtx"), "/path/to/slice", mock.AnythingOfType("*client.GetOptions")).Return(&client.Response{Node: &client.Node{
-		Dir:   true,
-		Nodes: []*client.Node{&client.Node{Key: "/path/to/slice/1"}, &client.Node{Key: "/path/to/slice/2"}, &client.Node{Key: "/path/to/slice/3"}},
+		Dir: true,
+		Nodes: []*client.Node{
+			&client.Node{Key: "/path/to/slice/1", Value: "10"},
+			&client.Node{Key: "/path/to/slice/2", Value: "30"},
+			&client.Node{Key: "/path/to/slice/3", Value: "50"},
+		},
 	}}, nil)
-	etcd.On("Get", mock.AnythingOfType("*context.emptyCtx"), "/path/to/slice/1", mock.AnythingOfType("*client.GetOptions")).Return(&client.Response{Node: &client.Node{Value: "10"}}, nil)
-	etcd.On("Get", mock.AnythingOfType("*context.emptyCtx"), "/path/to/slice/2", mock.AnythingOfType("*client.GetOptions")).Return(&client.Response{Node: &client.Node{Value: "30"}}, nil)
-	etcd.On("Get", mock.AnythingOfType("*context.emptyCtx"), "/path/to/slice/3", mock.AnythingOfType("*client.GetOptions")).Return(&client.Response{Node: &client.Node{Value: "50"}}, nil)
 
 	var s = make([]int, 0)
 
@@ -273,7 +304,12 @@ func TestDecodeSimpleSlice(t *testing.T) {
 
 func TestDecodeIgnoreTag(t *testing.T) {
 	etcd := new(test.KeysAPIMock)
-	etcd.On("Get", mock.AnythingOfType("*context.emptyCtx"), "/path/to/some/struct/field", mock.AnythingOfType("*client.GetOptions")).Return(&client.Response{Node: &client.Node{Value: "10"}}, nil)
+	etcd.On("Get", mock.AnythingOfType("*context.emptyCtx"), "/path/to/some/struct", mock.AnythingOfType("*client.GetOptions")).Return(&client.Response{Node: &client.Node{
+		Dir: true,
+		Nodes: []*client.Node{
+			&client.Node{Key: "/path/to/some/struct/field", Value: "10"},
+		},
+	}}, nil)
 
 	var s = struct {
 		Field1 int64 `etcd:"field"`
@@ -289,8 +325,12 @@ func TestDecodeIgnoreTag(t *testing.T) {
 
 func TestDecodeOmitEmptyError(t *testing.T) {
 	etcd := new(test.KeysAPIMock)
-	etcd.On("Get", mock.AnythingOfType("*context.emptyCtx"), "/path/to/some/struct/Field", mock.AnythingOfType("*client.GetOptions")).Return(nil, client.Error{Code: client.ErrorCodeKeyNotFound, Message: "Key not found"})
-	etcd.On("Get", mock.AnythingOfType("*context.emptyCtx"), "/path/to/some/struct/Field2", mock.AnythingOfType("*client.GetOptions")).Return(&client.Response{Node: &client.Node{Value: "10"}}, nil)
+	etcd.On("Get", mock.AnythingOfType("*context.emptyCtx"), "/path/to/some/struct", mock.AnythingOfType("*client.GetOptions")).Return(&client.Response{Node: &client.Node{
+		Dir: true,
+		Nodes: []*client.Node{
+			&client.Node{Key: "/path/to/some/struct/Field2", Value: "10"},
+		},
+	}}, nil)
 
 	var s = struct {
 		Field  int64 `etcd:",omitempty"`

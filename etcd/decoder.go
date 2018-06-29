@@ -85,13 +85,22 @@ func (d *decoder) indirect(v reflect.Value) (json.Unmarshaler, encoding.TextUnma
 }
 
 func (d *decoder) decode(path string, value reflect.Value, ctx context.Context) error {
+	node, err := d.getNode(path, ctx)
+	if node == nil {
+		return err
+	}
+
+	return d.decodeNode(node, value, ctx)
+}
+
+func (d *decoder) decodeNode(node *client.Node, value reflect.Value, ctx context.Context) error {
 	u, tu, value := d.indirect(value)
 	if u != nil {
-		return d.decodeUnmarshaler(u, path, ctx)
+		return d.decodeUnmarshaler(u, node, ctx)
 	}
 
 	if tu != nil {
-		return d.decodeTextUnmarshaler(tu, path, ctx)
+		return d.decodeTextUnmarshaler(tu, node, ctx)
 	}
 
 	switch value.Kind() {
@@ -102,66 +111,46 @@ func (d *decoder) decode(path string, value reflect.Value, ctx context.Context) 
 		return errors.New("can't decode channel: not implemented")
 
 	case reflect.Ptr:
-		d.decode(path, value.Elem(), ctx)
+		d.decodeNode(node, value.Elem(), ctx)
 
 	case reflect.Interface:
 		v := reflect.New(value.Elem().Type()).Elem()
-		d.decode(path, v, ctx)
+		d.decodeNode(node, v, ctx)
 		value.Set(v)
 
 	case reflect.Struct:
-		if err := d.decodeStruct(path, value, ctx); err != nil {
+		if err := d.decodeStruct(node, value, ctx); err != nil {
 			return err
 		}
 
 	case reflect.Map:
-		if err := d.decodeMap(path, value, ctx); err != nil {
+		if err := d.decodeMap(node, value, ctx); err != nil {
 			return err
 		}
 
 	case reflect.Slice, reflect.Array:
-		if err := d.decodeSlice(path, value, ctx); err != nil {
+		if err := d.decodeSlice(node, value, ctx); err != nil {
 			return err
 		}
 
 	default:
-		node, err := d.getNode(path, ctx)
-		if node == nil {
-			return err
-		}
-
 		return decodePrimitive(node.Value, value)
 	}
 
 	return nil
 }
 
-func (d *decoder) decodeUnmarshaler(u json.Unmarshaler, path string, ctx context.Context) error {
-	node, err := d.getNode(path, ctx)
-	if node == nil {
-		return err
-	}
-
+func (d *decoder) decodeUnmarshaler(u json.Unmarshaler, node *client.Node, ctx context.Context) error {
 	return u.UnmarshalJSON([]byte(node.Value))
 }
 
-func (d *decoder) decodeTextUnmarshaler(u encoding.TextUnmarshaler, path string, ctx context.Context) error {
-	node, err := d.getNode(path, ctx)
-	if node == nil {
-		return err
-	}
-
+func (d *decoder) decodeTextUnmarshaler(u encoding.TextUnmarshaler, node *client.Node, ctx context.Context) error {
 	return u.UnmarshalText([]byte(node.Value))
 }
 
-func (d *decoder) decodeSlice(path string, value reflect.Value, ctx context.Context) error {
-	node, err := d.getNode(path, ctx)
-	if node == nil {
-		return err
-	}
-
+func (d *decoder) decodeSlice(node *client.Node, value reflect.Value, ctx context.Context) error {
 	if !node.Dir {
-		return errors.New(fmt.Sprintf("%s is not a dir", path))
+		return errors.New(fmt.Sprintf("%s is not a dir", node.Key))
 	}
 
 	if value.IsNil() {
@@ -170,23 +159,25 @@ func (d *decoder) decodeSlice(path string, value reflect.Value, ctx context.Cont
 
 	for _, node := range node.Nodes {
 		sliceValue := reflect.New(value.Type().Elem()).Elem()
-		if err := d.decode(node.Key, sliceValue, ctx); err != nil {
-			return err
+		if node.Dir {
+			if err := d.decode(node.Key, sliceValue, ctx); err != nil {
+				return err
+			}
+		} else {
+			if err := d.decodeNode(node, sliceValue, ctx); err != nil {
+				return err
+			}
 		}
+
 		value.Set(reflect.Append(value, sliceValue))
 	}
 
 	return nil
 }
 
-func (d *decoder) decodeMap(path string, value reflect.Value, ctx context.Context) error {
-	node, err := d.getNode(path, ctx)
-	if node == nil {
-		return err
-	}
-
+func (d *decoder) decodeMap(node *client.Node, value reflect.Value, ctx context.Context) error {
 	if !node.Dir {
-		return errors.New(fmt.Sprintf("%s is not a dir", path))
+		return errors.New(fmt.Sprintf("%s is not a dir", node.Key))
 	}
 
 	if value.IsNil() {
@@ -195,8 +186,14 @@ func (d *decoder) decodeMap(path string, value reflect.Value, ctx context.Contex
 
 	for _, node := range node.Nodes {
 		mapValue := reflect.New(value.Type().Elem()).Elem()
-		if err := d.decode(node.Key, mapValue, ctx); err != nil {
-			return err
+		if node.Dir {
+			if err := d.decode(node.Key, mapValue, ctx); err != nil {
+				return err
+			}
+		} else {
+			if err := d.decodeNode(node, mapValue, ctx); err != nil {
+				return err
+			}
 		}
 
 		mapKey := reflect.New(value.Type().Key()).Elem()
@@ -208,7 +205,17 @@ func (d *decoder) decodeMap(path string, value reflect.Value, ctx context.Contex
 	return nil
 }
 
-func (d *decoder) decodeStruct(path string, value reflect.Value, ctx context.Context) error {
+func (d *decoder) decodeStruct(top *client.Node, value reflect.Value, ctx context.Context) error {
+	if !top.Dir {
+		return errors.New(fmt.Sprintf("%s is not a dir", top.Key))
+	}
+
+	nodes := make(map[string]*client.Node)
+	for _, node := range top.Nodes {
+		p := strings.Split(node.Key, "/")
+		nodes[p[len(p)-1]] = node
+	}
+
 	for i := 0; i < value.NumField(); i++ {
 		typeField := value.Type().Field(i)
 		name := typeField.Name
@@ -218,8 +225,23 @@ func (d *decoder) decodeStruct(path string, value reflect.Value, ctx context.Con
 			if len(params) > 0 && params[0] != "" {
 				name = params[0]
 			}
-			if err := d.decode(fmt.Sprintf("%s/%s", path, name), value.Field(i), ctx); err != nil {
-				if !canOmitEmpty(err, params) {
+
+			node, ok := nodes[name]
+			if !ok {
+				if isOmitEmpty(params) {
+					continue
+				}
+				return fmt.Errorf("Key %s not found", fmt.Sprintf("%s/%s", top.Key, name))
+			}
+
+			if node.Dir {
+				if err := d.decode(node.Key, value.Field(i), ctx); err != nil {
+					if !canOmitEmpty(err, params) {
+						return err
+					}
+				}
+			} else {
+				if err := d.decodeNode(node, value.Field(i), ctx); err != nil {
 					return err
 				}
 			}
@@ -293,12 +315,16 @@ func decodePrimitive(nodeValue string, value reflect.Value) error {
 	return nil
 }
 
-func canOmitEmpty(err error, params []string) bool {
+func isOmitEmpty(params []string) bool {
 	if len(params) < 2 {
 		return false
 	}
 
-	if e, ok := err.(client.Error); ok && params[1] == "omitempty" && e.Code == client.ErrorCodeKeyNotFound {
+	return params[1] == "omitempty"
+}
+
+func canOmitEmpty(err error, params []string) bool {
+	if e, ok := err.(client.Error); ok && isOmitEmpty(params) && e.Code == client.ErrorCodeKeyNotFound {
 		return true
 	}
 

@@ -1,7 +1,6 @@
 package etcd
 
 import (
-	"fmt"
 	"testing"
 	"time"
 
@@ -45,7 +44,7 @@ type ComplexStruct struct {
 
 func getKeysApi() client.KeysAPI {
 	c, err := client.New(client.Config{
-		Endpoints: []string{"http://localhost:4001"},
+		Endpoints: []string{"http://localhost:2379"},
 		Transport: client.DefaultTransport,
 	})
 	if err != nil {
@@ -104,10 +103,12 @@ func TestIntegrationEncodingDecoding(t *testing.T) {
 func BenchmarkEncodingDecoding(b *testing.B) {
 	keysApi := getKeysApi()
 	keysApi.Delete(context.Background(), ETCD_TEST_KEY, &client.DeleteOptions{Recursive: true})
+	testEncodeStruct(keysApi)
 
 	b.ResetTimer()
-	testEncodeStruct(keysApi)
-	s, _ := testDecodeStruct(keysApi)
-	fmt.Println(s)
 	b.ReportAllocs()
+
+	for i := 0; i < b.N; i++ {
+		testDecodeStruct(keysApi)
+	}
 }
