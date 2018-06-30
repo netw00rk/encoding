@@ -21,6 +21,8 @@ type Decoder interface {
 	SkipMissing(bool)
 }
 
+type decoderFn func(*client.Node, reflect.Value, context.Context) error
+
 type decoder struct {
 	client      client.KeysAPI
 	skipMissing bool
@@ -90,53 +92,75 @@ func (d *decoder) decode(path string, value reflect.Value, ctx context.Context) 
 		return err
 	}
 
-	return d.decodeNode(node, value, ctx)
+	decoder := d.decoder(value)
+	return decoder(node, value, ctx)
 }
 
 func (d *decoder) decodeNode(node *client.Node, value reflect.Value, ctx context.Context) error {
+	decoder := d.decoder(value)
+	return decoder(node, value, ctx)
+}
+
+func (d *decoder) decoder(value reflect.Value) decoderFn {
 	u, tu, value := d.indirect(value)
 	if u != nil {
-		return d.decodeUnmarshaler(u, node, ctx)
+		return func(n *client.Node, v reflect.Value, ctx context.Context) error {
+			return d.decodeUnmarshaler(u, n, ctx)
+		}
 	}
 
 	if tu != nil {
-		return d.decodeTextUnmarshaler(tu, node, ctx)
+		return func(n *client.Node, v reflect.Value, ctx context.Context) error {
+			return d.decodeTextUnmarshaler(tu, n, ctx)
+		}
 	}
 
 	switch value.Kind() {
 	case reflect.Func:
-		return errors.New("can't decode func: not implemented")
+		return func(n *client.Node, v reflect.Value, ctx context.Context) error {
+			return errors.New("can't decode func: not implemented")
+		}
 
 	case reflect.Chan:
-		return errors.New("can't decode channel: not implemented")
+		return func(n *client.Node, v reflect.Value, ctx context.Context) error {
+			return errors.New("can't decode channel: not implemented")
+		}
 
 	case reflect.Ptr:
-		d.decodeNode(node, value.Elem(), ctx)
+		return d.decodePointer
 
 	case reflect.Interface:
-		v := reflect.New(value.Elem().Type()).Elem()
-		d.decodeNode(node, v, ctx)
-		value.Set(v)
+		return d.decodeInterface
 
 	case reflect.Struct:
-		if err := d.decodeStruct(node, value, ctx); err != nil {
-			return err
-		}
+		return d.decodeStruct
 
 	case reflect.Map:
-		if err := d.decodeMap(node, value, ctx); err != nil {
-			return err
-		}
+		return d.decodeMap
 
 	case reflect.Slice, reflect.Array:
-		if err := d.decodeSlice(node, value, ctx); err != nil {
-			return err
-		}
+		return d.decodeSlice
 
 	default:
-		return decodePrimitive(node.Value, value)
+		return func(n *client.Node, v reflect.Value, ctx context.Context) error {
+			return decodePrimitive(n.Value, v)
+		}
 	}
 
+	return nil
+}
+
+func (d *decoder) decodePointer(node *client.Node, value reflect.Value, ctx context.Context) error {
+	return d.decodeNode(node, value.Elem(), ctx)
+}
+
+func (d *decoder) decodeInterface(node *client.Node, value reflect.Value, ctx context.Context) error {
+	v := reflect.New(value.Elem().Type()).Elem()
+	if err := d.decodeNode(node, v, ctx); err != nil {
+		return err
+	}
+
+	value.Set(v)
 	return nil
 }
 
