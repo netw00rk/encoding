@@ -85,6 +85,10 @@ func testDecodeStruct(keysApi client.KeysAPI) (*ComplexStruct, error) {
 }
 
 func TestIntegrationEncodingDecoding(t *testing.T) {
+	if testing.Short() {
+		t.Skip("skipping test in short mode.")
+	}
+
 	keysApi := getKeysApi()
 
 	_, err := keysApi.Delete(context.Background(), ETCD_TEST_KEY, &client.DeleteOptions{Recursive: true})

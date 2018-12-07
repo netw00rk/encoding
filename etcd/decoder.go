@@ -177,8 +177,8 @@ func (d *decoder) decodeSlice(node *client.Node, value reflect.Value, ctx contex
 		return errors.New(fmt.Sprintf("%s is not a dir", node.Key))
 	}
 
-	if value.IsNil() {
-		value.Set(reflect.MakeSlice(value.Type(), value.Len(), value.Cap()))
+	if value.IsNil() || value.Len() == 0 {
+		value.Set(reflect.MakeSlice(value.Type(), len(node.Nodes), len(node.Nodes)))
 	}
 
 	for _, node := range node.Nodes {
@@ -193,7 +193,11 @@ func (d *decoder) decodeSlice(node *client.Node, value reflect.Value, ctx contex
 			}
 		}
 
-		value.Set(reflect.Append(value, sliceValue))
+		tmp := strings.Split(node.Key, "/")
+		index, _ := strconv.Atoi(tmp[len(tmp)-1])
+
+		el := value.Index(index)
+		el.Set(sliceValue)
 	}
 
 	return nil

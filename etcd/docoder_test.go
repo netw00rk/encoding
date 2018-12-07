@@ -285,9 +285,9 @@ func TestDecodeSimpleSlice(t *testing.T) {
 	etcd.On("Get", mock.AnythingOfType("*context.emptyCtx"), "/path/to/slice", mock.AnythingOfType("*client.GetOptions")).Return(&client.Response{Node: &client.Node{
 		Dir: true,
 		Nodes: []*client.Node{
-			&client.Node{Key: "/path/to/slice/1", Value: "10"},
-			&client.Node{Key: "/path/to/slice/2", Value: "30"},
-			&client.Node{Key: "/path/to/slice/3", Value: "50"},
+			&client.Node{Key: "/path/to/slice/0", Value: "10"},
+			&client.Node{Key: "/path/to/slice/1", Value: "30"},
+			&client.Node{Key: "/path/to/slice/2", Value: "50"},
 		},
 	}}, nil)
 
