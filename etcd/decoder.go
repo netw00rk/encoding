@@ -53,7 +53,7 @@ func (d *decoder) DecodeWithContext(path string, v interface{}, ctx context.Cont
 	return d.decode(path, value.Elem(), ctx)
 }
 
-func (d *decoder) indirect(v reflect.Value) (json.Unmarshaler, encoding.TextUnmarshaler, reflect.Value) {
+func (d *decoder) indirect(v reflect.Value) (json.Unmarshaler, encoding.TextUnmarshaler) {
 	if v.Kind() != reflect.Ptr && v.Type().Name() != "" && v.CanAddr() {
 		v = v.Addr()
 	}
@@ -75,15 +75,15 @@ func (d *decoder) indirect(v reflect.Value) (json.Unmarshaler, encoding.TextUnma
 		}
 		if v.Type().NumMethod() > 0 {
 			if u, ok := v.Interface().(json.Unmarshaler); ok {
-				return u, nil, reflect.Value{}
+				return u, nil
 			}
 			if u, ok := v.Interface().(encoding.TextUnmarshaler); ok {
-				return nil, u, reflect.Value{}
+				return nil, u
 			}
 		}
 		v = v.Elem()
 	}
-	return nil, nil, v
+	return nil, nil
 }
 
 func (d *decoder) decode(path string, value reflect.Value, ctx context.Context) error {
@@ -102,7 +102,7 @@ func (d *decoder) decodeNode(node *client.Node, value reflect.Value, ctx context
 }
 
 func (d *decoder) decoder(value reflect.Value) decoderFn {
-	u, tu, value := d.indirect(value)
+	u, tu := d.indirect(value)
 	if u != nil {
 		return func(n *client.Node, v reflect.Value, ctx context.Context) error {
 			return d.decodeUnmarshaler(u, n, ctx)
@@ -151,6 +151,10 @@ func (d *decoder) decoder(value reflect.Value) decoderFn {
 }
 
 func (d *decoder) decodePointer(node *client.Node, value reflect.Value, ctx context.Context) error {
+	if value.IsNil() {
+		value.Set(reflect.New(value.Type().Elem()))
+	}
+
 	return d.decodeNode(node, value.Elem(), ctx)
 }
 

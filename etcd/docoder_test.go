@@ -246,7 +246,7 @@ func TestDecodeMapOfStructs(t *testing.T) {
 		},
 	}}, nil)
 
-	var m map[string]struct {
+	var m map[string]*struct {
 		Field1 int64
 	}
 
