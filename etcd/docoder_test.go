@@ -4,9 +4,9 @@ import (
 	"testing"
 	"time"
 
-	"github.com/coreos/etcd/client"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
+	"go.etcd.io/etcd/v3/client"
 
 	"github.com/netw00rk/encoding/etcd/test"
 )

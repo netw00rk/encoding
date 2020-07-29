@@ -6,7 +6,7 @@ It supports primitive data types, structs, slices, map with string keys.
 
 ```go
 import (
-    "github.com/coreos/etcd/client"
+	"go.etcd.io/etcd/v3/client"
     "github.com/netw00rk/encoding/etcd"
 )
 

@@ -12,7 +12,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/coreos/etcd/client"
+	"go.etcd.io/etcd/v3/client"
 )
 
 type Decoder interface {

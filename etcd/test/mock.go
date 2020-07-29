@@ -3,8 +3,8 @@ package test
 import (
 	"context"
 
-	"github.com/coreos/etcd/client"
 	"github.com/stretchr/testify/mock"
+	"go.etcd.io/etcd/v3/client"
 )
 
 type KeysAPIMock struct {

@@ -7,9 +7,7 @@ import (
 	"fmt"
 	"reflect"
 
-	//	"golang.org/x/net/context"
-
-	"github.com/coreos/etcd/client"
+	"go.etcd.io/etcd/v3/client"
 )
 
 var (

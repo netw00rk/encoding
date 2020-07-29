@@ -1,13 +1,12 @@
 package etcd
 
 import (
+	"context"
 	"testing"
 	"time"
 
-	"golang.org/x/net/context"
-
-	"github.com/coreos/etcd/client"
 	"github.com/stretchr/testify/assert"
+	"go.etcd.io/etcd/v3/client"
 )
 
 const ETCD_TEST_KEY = "/etcd/integration/test"
